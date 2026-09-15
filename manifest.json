@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Discord Voice Relay for Zen",
+  "short_name": "Discord Relay",
+  "version": "0.1.0",
+  "description": "Routes Discord Web voice through a user-provided TURN-over-TCP/TLS relay in Zen/Firefox.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://discord.com/*"
+  ],
+  "action": {
+    "default_title": "Discord Voice Relay",
+    "default_popup": "popup/popup.html",
+    "default_icon": "icons/icon.svg"
+  },
+  "icons": {
+    "48": "icons/icon.svg",
+    "96": "icons/icon.svg"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://discord.com/*"
+      ],
+      "js": [
+        "src/relay-config.js",
+        "src/page-hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://discord.com/*"
+      ],
+      "js": [
+        "src/bridge.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "discord-voice-relay@local.invalid",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": [
+          "authenticationInfo",
+          "personalCommunications"
+        ]
+      }
+    }
+  }
+}

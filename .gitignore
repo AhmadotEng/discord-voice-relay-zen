@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+coverage/
+*.log
+*.xpi
+*.zip
+dist/
+deploy/coturn/.env
+deploy/coturn/certs/
