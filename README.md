@@ -26,7 +26,7 @@ A normal HTTP, HTTPS, or SOCKS proxy is not a TURN server. Use a managed provide
 ## Install in Zen on macOS
 
 1. Obtain working TURN-over-TCP/TLS client credentials. See [Managed TURN setup](docs/managed-turn.md) or [Coturn setup](deploy/coturn/README.md).
-2. Download `discord-voice-relay-zen-0.1.0.xpi` and its `.sha256` file from the [latest release](https://github.com/AhmadotEng/discord-voice-relay-zen/releases/latest).
+2. Download `discord-voice-relay-zen-0.1.0.xpi` and its `.sha256` file from the [0.1.0 preview release](https://github.com/AhmadotEng/discord-voice-relay-zen/releases/tag/v0.1.0).
 3. Optionally verify the XPI in Terminal from the folder containing both files:
 
    ```sh

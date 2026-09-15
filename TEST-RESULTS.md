@@ -10,7 +10,7 @@ Candidate: version 0.1.0
 - 16/16 Node unit tests passed.
 - `web-ext lint` completed with zero errors and zero warnings.
 - The XPI passed ZIP integrity testing.
-- SHA-256 of the repository-built XPI: `4d3a4040fa884dc6b10afc87799367bf46343b2fd007154481c63b573afdb6d3`.
+- SHA-256 of the repository-built XPI: `357968af73e3fc1ad7334c8512613550d7a9b824d62847d1cc91bf00bda6f4ee`.
 - The repository-built XPI temporarily installed and initialized in Zen on macOS.
 - A live page-hook smoke test on `discord.com` confirmed that a targeted peer connection received the configured synthetic TURN server and `iceTransportPolicy: "relay"`; an invalid-port configuration was not applied.
 - A current Discord Web asset inspection found the `plan-b`, `unified-plan`, and `max-bundle` configuration markers targeted by the selection logic.
