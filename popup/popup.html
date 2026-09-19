@@ -1,63 +1,56 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Discord Voice Relay</title>
-    <link rel="stylesheet" href="popup.css">
-  </head>
-  <body>
-    <main>
-      <header>
-        <div class="logo" aria-hidden="true">↗</div>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Discord Direct</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header>
+      <img src="../icons/icon.svg" alt="">
+      <div>
+        <h1>Discord Direct</h1>
+        <p>Zen / Firefox</p>
+      </div>
+      <label class="switch" aria-label="Enable Discord Direct">
+        <input id="enabled" type="checkbox">
+        <span></span>
+      </label>
+    </header>
+
+    <section id="migration" class="notice hidden" aria-live="polite">
+      <strong>Previous relay settings were removed</strong>
+      <p>External TURN URLs and credentials from Discord Voice Relay were not reused. Reload an open Discord tab before testing this replacement.</p>
+      <button id="dismiss-migration" class="quiet" type="button">Dismiss</button>
+    </section>
+
+    <section class="status-card" aria-live="polite">
+      <div class="status-line">
+        <span id="status-dot" class="dot"></span>
         <div>
-          <h1>Discord Voice Relay</h1>
-          <p>Zen / Firefox</p>
+          <strong id="status-title">Checking…</strong>
+          <p id="status-detail">Reading the local route state.</p>
         </div>
-        <label class="switch" title="Enable for new Discord voice connections">
-          <input id="enabled" type="checkbox">
-          <span></span>
-        </label>
-      </header>
+      </div>
+    </section>
 
-      <section class="status-card" aria-live="polite">
-        <span id="status-dot" class="dot idle"></span>
-        <div>
-          <strong id="status-title">Checking Discord tab…</strong>
-          <p id="status-detail">Open discord.com/app in this tab.</p>
-        </div>
-      </section>
+    <section>
+      <label for="stun-servers">STUN discovery endpoints</label>
+      <textarea id="stun-servers" rows="3" spellcheck="false"></textarea>
+      <p class="hint">One <code>stun:host:port</code> per line. These servers only discover your public UDP mapping. They are not WARP, proxies, or TURN media relays.</p>
+    </section>
 
-      <form id="settings-form">
-        <label for="turn-urls">TURN TCP/TLS URL</label>
-        <textarea id="turn-urls" rows="3" spellcheck="false" placeholder="turns:relay.example.com:443?transport=tcp"></textarea>
-        <p class="hint"><code>relay.example.com</code> is only a placeholder; enter a real authenticated TURN service. Port 443 over <code>turns:</code> is usually the most firewall-friendly.</p>
+    <p id="form-error" class="error hidden" role="alert"></p>
+    <button id="save" class="primary" type="button">Save settings</button>
 
-        <div class="two-columns">
-          <label>
-            Username
-            <input id="turn-username" type="text" autocomplete="off">
-          </label>
-          <label>
-            Credential
-            <input id="turn-credential" type="password" autocomplete="off">
-          </label>
-        </div>
-
-        <label class="check-row">
-          <input id="tcp-only" type="checkbox">
-          <span>Reject UDP-only TURN URLs</span>
-        </label>
-
-        <div id="validation" class="validation" hidden></div>
-        <button id="save" type="submit">Save and reconnect voice</button>
-      </form>
-
-      <footer>
-        <p>The credential stays in Zen storage but is supplied to discord.com for WebRTC. Encrypted call traffic then passes through your chosen TURN relay.</p>
-      </footer>
-    </main>
-    <script src="../src/relay-config.js"></script>
-    <script src="popup.js"></script>
-  </body>
+    <footer>
+      <p>Wait for <strong>Ready</strong>, then reconnect Discord voice once. This extension never leaves, joins, disconnects, or reconnects a call automatically.</p>
+    </footer>
+  </main>
+  <script src="../src/config.js"></script>
+  <script src="../src/popup-status.js"></script>
+  <script src="popup.js"></script>
+</body>
 </html>

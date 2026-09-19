@@ -1,0 +1,77 @@
+[
+  {
+    "namespace": "experiments.loopbackTurn",
+    "functions": [
+      {
+        "name": "start",
+        "type": "function",
+        "async": true,
+        "parameters": [
+          {
+            "name": "options",
+            "type": "object",
+            "optional": true,
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["local-test", "remote-mapped"],
+                "optional": true
+              },
+              "port": { "type": "integer", "minimum": 0, "maximum": 65535, "optional": true },
+              "username": { "type": "string", "optional": true },
+              "credential": { "type": "string", "optional": true },
+              "realm": { "type": "string", "optional": true },
+              "advertisedRelayAddress": { "type": "string", "optional": true },
+              "mappingProbeServers": {
+                "type": "array",
+                "optional": true,
+                "maxItems": 8,
+                "items": { "type": "string" }
+              },
+              "mappingProbeTimeoutMs": {
+                "type": "integer",
+                "minimum": 500,
+                "maximum": 10000,
+                "optional": true
+              },
+              "mappingProbeRetries": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4,
+                "optional": true
+              },
+              "triggerLength": { "type": "integer", "minimum": 0, "maximum": 65507, "optional": true },
+              "delayMs": { "type": "integer", "minimum": 0, "maximum": 5000, "optional": true },
+              "allowPrivatePeers": { "type": "boolean", "optional": true },
+              "preludePackets": {
+                "type": "array",
+                "optional": true,
+                "maxItems": 8,
+                "items": {
+                  "type": "array",
+                  "maxItems": 2048,
+                  "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+                }
+              }
+            }
+          }
+        ],
+        "returns": { "type": "any" }
+      },
+      {
+        "name": "status",
+        "type": "function",
+        "async": true,
+        "parameters": [],
+        "returns": { "type": "any" }
+      },
+      {
+        "name": "stop",
+        "type": "function",
+        "async": true,
+        "parameters": [],
+        "returns": { "type": "any" }
+      }
+    ]
+  }
+]

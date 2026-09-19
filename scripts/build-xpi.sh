@@ -10,9 +10,9 @@ if [ -z "$version" ]; then
 fi
 
 output_dir="$project_dir/dist"
-filename="discord-voice-relay-zen-$version.xpi"
+filename="discord-direct-zen-$version-unsigned.xpi"
 output="$output_dir/$filename"
-temporary="$output_dir/.discord-voice-relay-zen-$version.tmp.xpi"
+temporary="$output_dir/.discord-direct-zen-$version.tmp.xpi"
 
 mkdir -p "$output_dir"
 rm -f "$temporary"
@@ -20,13 +20,20 @@ rm -f "$temporary"
 cd "$project_dir"
 zip -X -q "$temporary" \
   manifest.json \
-  src/relay-config.js \
-  src/page-hook.js \
-  src/bridge.js \
-  popup/popup.html \
-  popup/popup.css \
-  popup/popup.js \
+  api/implementation-gecko147.js \
+  api/schema.json \
+  background.js \
   icons/icon.svg \
+  lib/mapping-policy.js \
+  lib/turn-codec.js \
+  package.json \
+  popup/popup.css \
+  popup/popup.html \
+  popup/popup.js \
+  src/bridge.js \
+  src/config.js \
+  src/page-hook.js \
+  src/popup-status.js \
   LICENSE \
   PRIVACY.md \
   README.md

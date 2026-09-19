@@ -1,18 +1,27 @@
 # Privacy disclosure
 
-Discord Voice Relay for Zen has no developer-operated service, analytics, advertising, or telemetry. It does not read Discord tokens, text messages, guilds, contacts, or decoded call audio.
+Discord Direct for Zen has no developer-operated service, analytics, advertising, telemetry, or remote code. It does not read Discord tokens, messages, guilds, contacts, cookies, browsing history, or decoded call audio.
 
-When you explicitly enable the relay, the extension supplies the TURN URL, username, and credential you entered to `discord.com`'s WebRTC context. The browser then transmits that authentication information to your chosen TURN server and routes encrypted Discord call traffic through that server. This is why the Firefox manifest declares required transmission of **authentication information** and **personal communications**.
+## Data stored locally
 
-## Where data goes
+Zen's extension storage keeps only the enabled state and the user-configured STUN discovery URLs. Version 0.2.4 removes the external TURN URL, username, credential, and TCP-only values saved by legacy version 0.1.0.
 
-- TURN settings are kept in Zen's local extension storage until you change them or remove the extension.
-- While enabled, page scripts on `https://discord.com` can technically inspect the TURN client credential through the page's WebRTC configuration. The extension therefore expects a short-lived client credential or a dedicated, tightly limited Coturn account—never a provider API token or shared credential-minting secret.
-- The chosen TURN operator can observe network metadata such as your IP address, Discord's media endpoint, timing, and traffic volume. Discord/WebRTC media remains encrypted in transit, but you should use a relay operator you trust.
-- When the toggle is off, the bridge does not send the stored username or credential into the page. An already-open relayed peer connection can retain its earlier WebRTC configuration until you disconnect or reload Discord.
+The loopback TURN username and credential used by version 0.2.4 are generated for the current backend instance, kept in background memory, and never written to extension storage or logs.
+
+## Network data
+
+- The configured STUN discovery endpoints receive small mapping probes and can observe the public IP address and UDP port from which each probe arrives.
+- When a protected Discord voice connection starts, encrypted WebRTC traffic travels from an extension-owned UDP socket to Discord's selected media endpoint. It does not pass through Cloudflare, Twilio, a project-operated service, or an external TURN relay.
+- Discord and ordinary network operators can observe the transport metadata they would normally see, including endpoint addresses, timing, and traffic volume.
+
+The defaults are `stun.cloudflare.com:3478` and `global.stun.twilio.com:3478`. They are discovery services only. Users may replace them with compatible STUN services, but mapping must agree across two distinct destinations before the route becomes ready.
+
+## Diagnostics
+
+User-visible status contains bounded counters, state names, candidate type/protocol, an opaque boot identifier, and monotonic generation/revision values. It does not retain URLs, SDP, candidate strings, IP addresses, allocation identifiers, Discord IDs, tokens, credentials, messages, or media.
+
+The internal live route-verification exchange transiently compares the selected relay endpoint and an opaque allocation identifier with the current backend allocation. Those values are not stored, logged, or displayed.
 
 ## Your controls
 
-Disable the toggle and reconnect Discord voice to stop using the relay. Clear the saved fields to remove the credential from extension storage, or remove the extension from Zen to delete its local storage. Temporary installations are also removed when Zen exits.
-
-The popup's status is a convenience diagnostic, not a security boundary: code running on the Discord page shares the main-world WebRTC context. For an independent check, inspect the selected candidate in `about:webrtc` and look for candidate type `relay` and relay protocol `tls` or `tcp`.
+Turn the extension off and reconnect Discord voice to stop applying it to new calls. Removing or disabling the add-on closes its sockets and restores the prior loopback preference. Because version 0.2.4 is loaded as a temporary add-on, Zen removes it when the browser fully exits.

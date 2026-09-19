@@ -1,129 +1,160 @@
-# Discord Voice Relay for Zen
+# Discord Direct for Zen
 
-A clean-room Zen/Firefox WebExtension that forces **Discord Web voice media** through an authenticated TURN relay over TCP or TLS. It is a browser-oriented alternative inspired by [Discord Drover](https://github.com/hdrover/discord-drover), but it does not reproduce Drover's Windows UDP packet trick.
+Discord Direct for Zen is an experimental, privileged Zen/Firefox extension that applies the Discord Drover transport idea to **new Discord Web voice connections** without installing WARP, a native helper, a local daemon, a system proxy, or an external media relay.
 
-> [!IMPORTANT]
-> Only the extension is installed locally, but this project still requires an external TURN service. It does not provide a relay server or zero-infrastructure "Direct mode."
+This direct build is version **0.2.4**. It replaces the earlier `Discord Voice Relay for Zen` version **0.1.0**, intentionally uses the same Gecko extension ID, clears that build's saved external TURN URL and credentials, and refuses to stack its page hook over an already-injected old hook. The original [v0.1.0 release](https://github.com/AhmadotEng/discord-voice-relay-zen/releases/tag/v0.1.0), tag, assets, and [setup document](LEGACY-V0.1.0.md) remain available.
 
-## Tested platform and status
+## Browser requirement
 
-- macOS 15.6.1 on Apple silicon
-- Zen Browser 1.18.10b / Gecko 147.0.4
-- Tested on September 15, 2026
-- 16/16 unit tests pass, `web-ext lint` reports no errors or warnings, XPI integrity passes, and temporary loading in Zen succeeds
-- Current Discord Web peer-connection configuration markers are recognized by the extension
+Discord Direct requires **Zen/Firefox 152 or newer**. Firefox 147 rejects a successful ICE Binding response when `XOR-MAPPED-ADDRESS` differs from the advertised relay candidate, so the call can remain at **Checking Route** even though the extension is sending and receiving the protected UDP traffic. Mozilla fixed that ICE relay validation behavior in [bug 2034159](https://bugzilla.mozilla.org/show_bug.cgi?id=2034159).
 
-A complete authenticated Discord voice call through a real TURN server has **not** yet been validated. Windows, Linux, other Zen releases, and later Discord Web changes remain untested.
+Zen **1.22.2b**, based on Firefox 156, includes the fix and is a supported current version. Older Zen builds based on Firefox 147 are intentionally rejected by the add-on manifest instead of failing later with an opaque voice-connection error.
 
-## Requirements
+## What it does
 
-- Zen/Firefox 142 or newer
-- A TURN service reachable through TCP or TLS, preferably `turns:...:443?transport=tcp`
-- A short-lived or dedicated TURN username and credential
+1. The privileged background API opens a TURN listener on an ephemeral `127.0.0.1` UDP port.
+2. Firefox sends its TURN traffic to that local listener.
+3. The extension unwraps TURN and sends Discord's peer UDP traffic from an extension-owned UDP socket.
+4. Before advertising that socket, it asks two independent public STUN discovery services what public IP/port they see. It proceeds only when both observations match.
+5. A `document_start` hook holds Discord's first offer, answer, or implicit local-description operation, requests a fresh background decision so cached state cannot win an enable race, installs the local TURN server, and forces `iceTransportPolicy: "relay"`.
+6. The first peer datagram triggers the two one-byte `0x00` and `0x01` prelude packets, followed by a 50 ms dispatch delay, on the same upstream socket.
 
-A normal HTTP, HTTPS, or SOCKS proxy is not a TURN server. Use a managed provider you trust or deploy the included [Coturn example](deploy/coturn/README.md) on a remote server that can reach Discord media endpoints.
+The default discovery endpoints are:
 
-## Install in Zen on macOS
+- `stun:stun.cloudflare.com:3478`
+- `stun:global.stun.twilio.com:3478`
 
-1. Obtain working TURN-over-TCP/TLS client credentials. See [Managed TURN setup](docs/managed-turn.md) or [Coturn setup](deploy/coturn/README.md).
-2. Download `discord-voice-relay-zen-0.1.0.xpi` and its `.sha256` file from the [0.1.0 preview release](https://github.com/AhmadotEng/discord-voice-relay-zen/releases/tag/v0.1.0).
-3. Optionally verify the XPI in Terminal from the folder containing both files:
+These are **STUN discovery endpoints only**. They receive small mapping probes. They are not Cloudflare WARP, proxies, TURN relays, or media carriers. Discord voice media does not pass through Cloudflare or Twilio in this design.
+
+## Important limitation
+
+This design works only when the network gives the extension-owned UDP socket a stable, endpoint-independent public mapping. It fails closed on a symmetric/address-dependent NAT, many carrier-grade NATs, blocked UDP, conflicting STUN observations, listener failure, late setup, or an unsupported Firefox ICE path. There is no extension-only correction for those network cases; a reachable relay or native/system transport would be required.
+
+Discord page code can replace the global `RTCPeerConnection` constructor after the extension's `document_start` hook. Popup status polling detects a missing hook brand and requires a full reload, but a connection created during the replacement gap cannot be retroactively intercepted.
+
+On September 19, 2026, version 0.2.4 passed a fresh live Discord call on macOS 15.6.1 on Apple silicon with Zen 1.22.2b / Firefox 156. The popup reached **Protected route verified**, Discord reported **Voice Connected**, the backend recorded bidirectional transport packets, and the user confirmed incoming voice audio. This validates that tested environment and network; it is not a guarantee for every NAT or provider. Do not treat “Ready” or a gathered relay candidate alone as proof. The popup reports success only after all of these agree:
+
+- Discord's selected local candidate is `relay`;
+- its relay protocol is UDP (or, on Firefox builds that omit `relayProtocol`, it is a relay candidate whose protocol is UDP; the configured local TURN URL is UDP-only);
+- the selected candidate belongs to the current background boot and backend generation;
+- the page proof matches the current proof-relevant backend route revision;
+- the local TURN allocation still exists and mapping discovery completed; and
+- upstream and downstream backend packet counters advanced.
+
+## macOS Zen setup
+
+This is a temporary privileged extension, not an ordinary signed Firefox add-on.
+
+1. Confirm Zen is version **1.22.2b or newer** (Firefox 152+ is required). Update Zen before loading this build if necessary.
+2. If the old **Discord Voice Relay for Zen** add-on is loaded, remove or replace it. This build uses the same extension ID so both cannot be loaded normally at the same time.
+3. Download `discord-direct-zen-0.2.4-unsigned.xpi` and its `.sha256` file from the [v0.2.4 release](https://github.com/AhmadotEng/discord-voice-relay-zen/releases/tag/v0.2.4).
+4. Optionally verify the download from the folder containing both files:
 
    ```sh
-   shasum -a 256 -c discord-voice-relay-zen-0.1.0.xpi.sha256
+   shasum -a 256 -c discord-direct-zen-0.2.4-unsigned.xpi.sha256
    ```
 
-4. Open `about:debugging#/runtime/this-firefox` in Zen.
-5. Select **Load Temporary Add-on…** and choose `discord-voice-relay-zen-0.1.0.xpi`.
-6. Open or reload `https://discord.com/app`.
-7. Open **Discord Voice Relay** from the extensions toolbar. Enter the TURN URL, username, and client credential, enable the relay, and save.
-8. Leave and rejoin the Discord voice call so a new peer connection uses the setting.
-9. Reopen the extension panel. It should report **Voice is using the relay**.
-10. Independently verify the selected connection in `about:webrtc`: candidate type should be `relay`, and `relayProtocol` should be `tls` or `tcp`.
+5. Open Zen and go to `about:debugging#/runtime/this-firefox`.
+6. Choose **Load Temporary Add-on…**.
+7. Select `discord-direct-zen-0.2.4-unsigned.xpi`, or select this checkout's `manifest.json` when developing from source.
+8. Open the **Discord Direct** toolbar button. You can also open its Preferences page from Zen's Add-ons Manager; both views use the same controls.
+9. Leave the two default STUN discovery endpoints in place, turn the extension on, and choose **Save settings**.
+10. Wait until the popup says **Ready**.
+11. Reload any Discord tab that was already open. This is mandatory when replacing the old add-on because JavaScript already injected into a page cannot be removed in place.
+12. Open `https://discord.com/app`. If you were already in voice, manually leave and rejoin once after the route is ready.
 
-Do not share screenshots of `about:webrtc` publicly because they can contain IP addresses. This extension does **not** need `extensions.experiments.enabled`.
+The extension does not click Discord controls and never joins, leaves, disconnects, or reconnects a call automatically.
 
-The unsigned XPI is a temporary development installation and disappears when Zen exits. Load it again after each restart. Because this is an ordinary WebExtension, a future Mozilla-signed unlisted build could support persistent installation, but none is provided yet.
+Temporary add-ons are removed when Zen exits. Repeat the loading steps after restarting Zen. Removing or disabling the add-on invokes the transport shutdown path, closes its UDP sockets, and restores the previous value of Firefox's `media.peerconnection.ice.loopback` preference.
 
-To test unpacked source, select this repository's `manifest.json` instead of the XPI in step 5.
+## Popup states
 
-## Recommended TURN URL
+- **Off** — Discord voice is untouched.
+- **Preparing route** — first offers are held; they cannot silently fall back to direct ICE.
+- **Ready** — the listener and loopback preference are active for the next voice connection. This is not yet an end-to-end success.
+- **Waiting for backend** — Discord selected a relay/UDP candidate, but the current allocation and packet flow are not fully confirmed yet.
+- **Protected route verified** — selected-pair proof matches the current proof-relevant backend revision, which still contains a live allocation with bidirectional packet evidence.
+- **Reconnect Discord voice** — the route changed, arrived too late, or stopped. The popup includes the exact bounded reason code; manually leave and rejoin once.
+- **Reload Discord** — the old page hook is still in the document or another hook replaced this one. Reload the page before reconnecting voice.
+- **Route unavailable** — the route failed closed; no normal direct offer was released while protection was enabled.
 
-Prefer TURN over TLS on port 443:
+## Replacement and legacy settings
 
-```text
-turns:relay.example.com:443?transport=tcp
-```
+Version `0.1.0` of Discord Voice Relay stored these keys: `enabled`, `turnUrls`, `turnUsername`, `turnCredential`, and `tcpOnly`. On first startup this build removes all five. It does not send an old provider URL or credential to Discord, the local backend, STUN, or storage under a new name. Direct mode starts disabled after that migration and shows a neutral migration notice.
 
-Plain TURN over TCP is also accepted when necessary:
+## Security and privacy boundaries
 
-```text
-turn:relay.example.com:3478?transport=tcp
-```
+- Host access is limited to `https://discord.com/*`; there is no `<all_urls>` permission.
+- The extension has no proxy, `webRequest`, cookies, downloads, history, native messaging, or system-install permission.
+- The TURN listener binds only to `127.0.0.1` and uses new random credentials each time it starts.
+- Credentials remain in background memory and are returned only to the isolated bridge in a matching top-level Discord document. They are never stored, logged, or shown in the popup.
+- User-visible/page status retains only bounded counters, state names, an opaque background-boot ID, the backend generation, a monotonic proof-relevant route revision, and candidate type/protocol. It does not retain URLs, SDP, candidate strings, IP addresses, Discord IDs, tokens, or media.
+- The private route response transiently supplies each live allocation's public mapped address/port, opaque allocation ID, and per-allocation packet counters to the Discord MAIN-world hook. The hook exact-matches those fields against Firefox's selected relay candidate so traffic from one call cannot verify another. These endpoint fields are not stored, logged, or emitted to the popup/page status; Discord can already inspect its own WebRTC candidate endpoints.
+- Public/private/reserved peer addresses are rejected in remote mode. Allocations, peer addresses, pending datagrams, connections, retries, and lifecycle waits are bounded.
+- Code in Discord's MAIN world is trusted application code, not a security boundary. A compromised page can inspect its own `RTCPeerConnection` configuration. The exposed credentials are therefore short-lived and valid only for a tightly constrained loopback TURN server; there is no reusable provider secret.
+- `media.peerconnection.ice.loopback` is a browser-wide testing preference while the backend runs. The privileged API snapshots and restores its exact prior user/default state on stop, failure, extension shutdown, and Zen shutdown.
 
-If the call remains at ICE checking:
+## Why a voice reconnect is required
 
-1. Confirm TCP/443 reaches the TURN host.
-2. Confirm the client credential is current.
-3. Confirm the TURN server can relay UDP from itself to Discord's media servers.
-4. Inspect `about:webrtc` for failed candidate checks.
-
-## How it works
-
-Discord Web creates browser-managed `RTCPeerConnection` objects. At document start, the extension wraps that constructor in Discord's main JavaScript world. For external Discord-like configurations, it replaces the ICE server list with the configured TURN service and sets `iceTransportPolicy: "relay"`. Discord's no-argument internal audio loopback connections are deliberately left alone.
-
-The extension also wraps `setConfiguration()` on targeted connections so later Discord configuration changes cannot silently remove the relay. Diagnostics retain only connection state, candidate type, and transport—never IP addresses, SDP, audio, messages, tokens, guilds, or channel IDs.
-
-```text
-Discord Web RTCPeerConnection
-              │
-              ▼
-Extension supplies TURN and relay-only policy
-              │
-              ▼
-       TURN over TCP/TLS
-              │
-              ▼
-       Discord media endpoint
-```
-
-Discord/WebRTC still encrypts media end to end at the transport layer. The TURN operator can observe network metadata such as endpoints, timing, and traffic volume, so use an operator you trust.
+Changing ICE servers on an already-connected `RTCPeerConnection` does not change its selected path. An ICE restart and a new offer/answer exchange would be required, but current Discord Web does not expose a safe client-initiated restart path. The extension therefore configures only a pristine new voice connection. If setup is late, it rejects the offer and asks for one manual reconnect instead of attempting to mutate a live call.
 
 ## Relationship to Discord Drover
 
-The original Discord Drover is Windows desktop software loaded beside `Discord.exe`. It hooks WinSock and changes the packet sequence around Discord Desktop's native UDP discovery traffic. Zen WebExtensions cannot access raw UDP datagrams, and Discord Web uses browser-managed ICE/DTLS/SRTP.
+[Discord Drover](https://github.com/hdrover/discord-drover) is Windows desktop software that hooks Winsock around Discord Desktop's native UDP traffic. A Zen extension cannot use that Windows mechanism. This project independently implements the browser path with a privileged Firefox API, a loopback TURN bridge, and an extension-owned UDP socket.
 
-This project therefore solves the browser problem by selecting a standards-based TURN relay, not by porting Drover's Direct mode. It contains no Drover source code or `drover-packet.bin`. The upstream repository does not declare a top-level license, so it is linked only for attribution and technical context.
+Version 0.2.4 sends the two one-byte `0x00` and `0x01` prelude datagrams before the first real peer datagram. It does not include Drover source code or `drover-packet.bin`; the upstream repository declares no top-level license and is linked only for attribution and technical context.
 
-## Security and account-policy notes
+## Testing and validation
 
-- TURN credentials are stored in Zen's local extension storage, not an encrypted vault. Prefer short-lived credentials or a dedicated low-quota account.
-- Discord page code can inspect a credential after it is supplied to the page's WebRTC configuration. Never enter a provider API token, Cloudflare TURN-key token, or Coturn shared secret.
-- Turning the extension off stops supplying credentials to new connections; disconnect or reload Discord to discard an existing call's configuration.
-- Never operate an unauthenticated public TURN server. Use authentication, quotas, and firewall rules.
-- The extension requests only storage and access to `https://discord.com/*`. It has no analytics, remote code, Discord API calls, or token access.
-- The panel status is a convenience diagnostic, not a tamper-proof security signal. Use `about:webrtc` for independent verification.
-- Modifying Discord Web behavior may carry account-policy risk. Confirm that your use complies with Discord's terms and applicable network or local rules.
-
-See [SECURITY.md](SECURITY.md) and [PRIVACY.md](PRIVACY.md) for reporting and data-handling details.
-
-## Development
-
-Run from the repository root:
+Run the dependency-free test suite with Node.js:
 
 ```sh
-node --test tests/*.test.js
-npx --yes web-ext@8.10.0 lint --source-dir . --ignore-files 'tests/**' 'deploy/**' 'dist/**' 'scripts/**'
+node --test tests/*.test.cjs
 ```
 
-Build a new XPI with:
+The suite covers the TURN codec and mapping policy, exact manifest boundaries, old-extension migration, loopback URL parsing, constructor targeting and subclass behavior, hook idempotency, offer/answer/implicit negotiation gates, background-boot and bridge-instance rollover, response races, multi-connection failure priority, the bounded readiness timeout, stale backend generations and proof revisions, stable revisions during ordinary counter growth, provisional ICE candidate errors, fail-closed errors, partial `setConfiguration()` merging with immutable fields, old-hook conflicts, and per-allocation selected-pair/backend success.
+
+The current suite passes **111/111** tests. The completed live test covered temporary installation, route preparation, a fresh Discord voice connection, a selected relay/UDP pair, **Protected route verified**, continued connection, and incoming audio.
+
+Additional environments and longer-lived behavior still need validation before treating this as production-ready:
+
+1. Confirm microphone audio with another participant, mute/unmute, participant changes, a channel change, TURN refresh, and a call lasting at least ten minutes.
+2. Stop the backend during a call and confirm voice fails rather than switching to a direct pair.
+3. Repeat on additional endpoint-independent NATs and on a deliberately destination-dependent NAT; the second case must fail closed.
+4. Repeat on Windows and Linux with a supported Zen/Firefox base.
+
+See [TESTING.md](TESTING.md) and [TEST-RESULTS.md](TEST-RESULTS.md) for the full procedure and recorded evidence.
+
+## Project layout
+
+- `api/implementation-gecko147.js` — privileged loopback TURN and upstream UDP transport copied from the reviewed PoC.
+- `lib/turn-codec.js` and `lib/mapping-policy.js` — TURN framing, authentication, address policy, and two-destination mapping decision.
+- `background.js` — settings migration, listener lifecycle, generation control, sender checks, and sanitized status.
+- `src/page-hook.js` — MAIN-world constructor hook, first-offer gate, route enforcement, and selected-pair verification.
+- `src/bridge.js` — isolated, top-level Discord bridge; no privileged callable crosses into the page.
+- `popup/` — enable state, STUN discovery settings, and non-automatic reconnect guidance.
+
+## Dependencies and development
+
+The extension has no npm packages, native helper, service, external relay, or runtime download. Runtime imports come only from Zen/Firefox's built-in privileged modules. The tests use Node.js built-ins only; do not commit `node_modules`.
 
 ```sh
-./scripts/build-xpi.sh
+npm test
+npm run build
 ```
 
-See [TESTING.md](TESTING.md) and [TEST-RESULTS.md](TEST-RESULTS.md) for detailed verification and current limitations.
+The macOS build script uses the system `zip` and `shasum` commands, writes the unsigned XPI and checksum to `dist/`, and packages every runtime file required by version 0.2.4.
 
 ## License and project status
 
-Released under the [MIT License](LICENSE). This independent project is not affiliated with Discord, Discord Drover or its author, Zen Browser, Mozilla, Cloudflare, or any TURN provider.
+Released under the [MIT License](LICENSE). This independent experimental project is not affiliated with Discord, Discord Drover or its author, Zen Browser, Mozilla, Cloudflare, or Twilio.
+
+## Not supported
+
+- Chrome, Chromium, or ordinary Firefox/Zen extension signing.
+- Discord's desktop client.
+- Existing calls without one manual reconnect.
+- TCP-only networks.
+- Symmetric/address-dependent NAT correction.
+- External TURN credentials or an external media relay.
+- Cloudflare WARP or any generic “free proxy” behavior.

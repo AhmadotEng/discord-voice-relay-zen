@@ -5,5 +5,3 @@ coverage/
 *.xpi
 *.zip
 dist/
-deploy/coturn/.env
-deploy/coturn/certs/

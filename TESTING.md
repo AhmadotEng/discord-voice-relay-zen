@@ -1,42 +1,52 @@
-# Testing Discord Voice Relay for Zen
+# Testing Discord Direct for Zen
 
 ## Automated checks
 
-From the repository root:
+From the repository root, use Node.js 20 or newer:
 
 ```sh
-node --test tests/*.test.js
-npx --yes web-ext@8.10.0 lint --source-dir . --ignore-files 'tests/**' 'deploy/**' 'dist/**' 'scripts/**'
+npm test
 ```
 
-The tests cover settings validation, TURN URL restrictions, Discord peer-connection selection, constructor and `setConfiguration()` wrapping, page/extension bridging, popup state, and status redaction.
+The project has no npm dependencies. The suite uses only Node.js built-ins and currently contains 111 tests covering manifest permissions, migration from version 0.1.0, TURN framing/authentication, address policy, mapping consensus, backend lifecycle, bounded resources, page/bridge isolation, negotiation races, fail-closed behavior, popup evidence, and Firefox 156 loader compatibility.
 
-## Temporary load on macOS
+Build the unsigned XPI and checksum on macOS with:
 
-1. Open `about:debugging#/runtime/this-firefox` in Zen.
-2. Load the release XPI, or select this repository's `manifest.json` for unpacked source.
-3. Open `https://discord.com/app` and confirm the extension's page hook initializes.
-4. Open the popup, save a syntactically valid test configuration, and confirm no raw credential appears in diagnostics or logs.
+```sh
+npm run build
+unzip -t dist/discord-direct-zen-0.2.4-unsigned.xpi
+shasum -a 256 -c dist/discord-direct-zen-0.2.4-unsigned.xpi.sha256
+```
 
-No `extensions.experiments.enabled` change is required.
+## Temporary loading on macOS
 
-## Authenticated end-to-end test
+1. Use Zen 1.22.2b or newer, backed by Firefox 152 or newer.
+2. Open `about:debugging#/runtime/this-firefox`.
+3. Remove the old **Discord Voice Relay for Zen** temporary add-on if it is present.
+4. Choose **Load Temporary Add-on…** and select the v0.2.4 XPI or this repository's `manifest.json`.
+5. Open the **Discord Direct** popup, enable it, keep two distinct STUN discovery endpoints, and save.
+6. Wait for **Ready**, then reload any Discord tab that was already open.
 
-Use a dedicated or short-lived credential from a TURN service you control or trust:
+Temporary add-ons disappear after Zen fully exits. No manual `about:config` change or native/system installation is required; the privileged backend temporarily manages and restores the loopback preference itself.
 
-1. Configure `turns:HOST:443?transport=tcp`, the client username, and client credential.
-2. Enable and save the extension.
-3. Reload Discord, join a voice channel, then leave and rejoin once.
-4. Confirm two-way audio for several minutes.
-5. Open `about:webrtc` and verify the selected local candidate is type `relay` with `relayProtocol` equal to `tls` or `tcp`.
-6. Confirm no host candidate was selected for the targeted external connection.
-7. Disable the extension, reconnect, and confirm the saved TURN server is no longer supplied.
+## Live Discord test
 
-Do not publish `about:webrtc` output. Redact IP addresses, usernames, credentials, SDP, and candidate details from bug reports.
+1. Open a freshly reloaded `https://discord.com/app` tab.
+2. Confirm the popup says **Discord hook ready** or **Ready** before joining voice.
+3. Join a voice channel or call once. Do not keep retrying while the route is preparing.
+4. Confirm Discord reports **Voice Connected**.
+5. Reopen the popup and require **Protected route verified**. **Ready** by itself is not an end-to-end result.
+6. Confirm incoming audio and ask another participant to confirm microphone audio.
+7. Exercise mute/unmute, a participant change, a channel change, and a call lasting at least ten minutes.
+8. Inspect `about:webrtc` only if needed. The selected local candidate should be relay/UDP. Do not publish the page because it can contain IP addresses and SDP.
 
-## Failure cases
+## Failure and isolation cases
 
-- Expired or incorrect credentials should fail closed at ICE rather than silently selecting a direct candidate while `iceTransportPolicy` is `relay`.
-- A TURN URL without `transport=tcp`, a non-TURN URL, or an invalid port must be rejected by the settings validator.
-- Discord's no-argument audio loopback `RTCPeerConnection` must remain untouched.
-- A later targeted `setConfiguration()` must retain the configured relay and relay-only policy.
+- Block either discovery endpoint and confirm setup fails closed.
+- Test on a destination-dependent/symmetric NAT and confirm no direct candidate is released while protection is enabled.
+- Replace the page hook or load an already-hooked Discord document and confirm the popup requests a reload.
+- Disable or remove the extension and confirm sockets close and the previous loopback preference is restored.
+- Stop the backend during a call and confirm the status loses verification instead of claiming stale success.
+- Confirm unrelated tabs and non-Discord WebRTC pages are untouched.
+
+Record the Zen version, Firefox base, operating system, extension checksum, route state, and redacted outcome for every live validation run.
