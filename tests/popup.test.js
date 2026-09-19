@@ -8,15 +8,17 @@ const vm = require("node:vm");
 
 const configSource = fs.readFileSync(path.join(__dirname, "../src/relay-config.js"), "utf8");
 const popupSource = fs.readFileSync(path.join(__dirname, "../popup/popup.js"), "utf8");
+const popupHtml = fs.readFileSync(path.join(__dirname, "../popup/popup.html"), "utf8");
 
-async function renderStatus(status) {
+async function renderStatus(status, savedSettings = {}) {
   const elements = new Map();
   for (const id of [
     "#settings-form", "#enabled", "#turn-urls", "#turn-username", "#turn-credential",
     "#tcp-only", "#validation", "#save", "#status-dot", "#status-title", "#status-detail"
   ]) {
     elements.set(id, {
-      addEventListener() {},
+      listeners: new Map(),
+      addEventListener(type, listener) { this.listeners.set(type, listener); },
       checked: false,
       value: "",
       hidden: true,
@@ -35,7 +37,8 @@ async function renderStatus(status) {
             enabled: true,
             turnUrls: "turns:relay.example:443?transport=tcp",
             turnUsername: "alice",
-            turnCredential: "secret"
+            turnCredential: "secret",
+            ...savedSettings
           };
         },
         async set() {}
@@ -100,4 +103,27 @@ test("popup lets a failed state override stale selected-candidate data", async (
     error: null
   });
   assert.equal(failed.get("#status-title").textContent, "Relay connection failed");
+});
+
+test("enabling an incomplete configuration replaces the stale off status", async () => {
+  const popup = await renderStatus(null, {
+    enabled: false,
+    turnUrls: "",
+    turnUsername: "",
+    turnCredential: ""
+  });
+  const enabled = popup.get("#enabled");
+
+  assert.equal(popup.get("#status-title").textContent, "Relay is off");
+  enabled.checked = true;
+  enabled.listeners.get("change")();
+
+  assert.equal(popup.get("#status-title").textContent, "Configuration required");
+  assert.equal(popup.get("#validation").hidden, false);
+  assert.match(popup.get("#validation").textContent, /Add at least one TURN URL/u);
+});
+
+test("popup identifies the sample relay hostname as a placeholder", () => {
+  assert.match(popupHtml, /relay\.example\.com<\/code> is only a placeholder/u);
+  assert.match(popupHtml, /real authenticated TURN service/u);
 });

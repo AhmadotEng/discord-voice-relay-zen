@@ -110,6 +110,14 @@
     showValidation(validation.errors);
     if (!elements.enabled.checked) {
       setStatus("idle", "Relay is off", "Save to stop changing new Discord voice connections.");
+    } else if (validation.errors.length > 0) {
+      setStatus(
+        "bad",
+        "Configuration required",
+        "Fix the TURN settings shown below, then save and reconnect Discord voice."
+      );
+    } else {
+      setStatus("warn", "Ready to save", "Save, then reconnect Discord voice to use the relay.");
     }
   });
 
