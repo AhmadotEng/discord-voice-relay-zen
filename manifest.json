@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "Discord Direct for Zen",
   "short_name": "Discord Direct",
-  "version": "0.2.4",
+  "version": "0.2.4.2",
   "description": "Routes new Discord Web voice connections through a privileged local TURN bridge without a native helper or external relay.",
   "permissions": [
     "storage",

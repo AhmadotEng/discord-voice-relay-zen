@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.4.2 — 2026-09-28
+
+- Preserve the original loopback preference baseline in a versioned local preference journal so a subsequent extension instance can restore it after a browser restart.
+- Restore the baseline when extension shutdown overlaps an existing asynchronous socket stop.
+- Recover the saved baseline even when the extension is stopped or disabled before its transport starts; merely loading the API still does not enable loopback.
+- Reject a malformed saved baseline instead of replacing it with a potentially modified current value.
+- Add 28 lifecycle regression tests covering absent, false, and true user preferences, restart recovery, repeated stops, and shutdown races.
+- Preserve the existing popup, settings, loopback-only listener, direct UDP routing, and route-verification behavior. This source update does not replace the historical v0.2.4 release assets.
+
 ## 0.2.4 — 2026-09-19
 
 - Replaced the external TURN-over-TCP/TLS design with an extension-owned loopback TURN bridge and direct UDP transport.

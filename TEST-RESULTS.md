@@ -1,5 +1,17 @@
 # Validation results
 
+## 0.2.4.2 source update — 2026-09-28
+
+- Platform: Windows; dependency-free Node test suite.
+- **139/139 tests passed**, with no failures or skipped tests, including 28 new preference-lifecycle cases.
+- Backend JavaScript syntax and `git diff --check` passed.
+- Tests cover original absent/false/true preferences, persisted-journal validation, restart recovery before transport starts, repeated cleanup, and overlapping stop/shutdown.
+- The diff preserves existing routing, popup/settings, permissions, and API startup timing.
+- This exact upstream patch has not received a new live Discord call or browser-restart test. Mocked lifecycle tests do not establish browser persistence or audio behavior. The historical live results and XPI checksum below apply only to v0.2.4.
+- No new release XPI is published as part of this source update.
+
+## Historical v0.2.4 validation
+
 Date: 2026-09-19
 
 Platform: macOS 15.6.1 on Apple silicon
