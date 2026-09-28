@@ -6,6 +6,7 @@ const {
 } = ChromeUtils.importESModule("resource://gre/modules/Timer.sys.mjs");
 
 const LOOPBACK_PREF = "media.peerconnection.ice.loopback";
+const LOOPBACK_SNAPSHOT_PREF = "extensions.discord-direct.loopback-pref-snapshot";
 const SOFTWARE = "Zen Discord direct loopback TURN PoC";
 const DEFAULT_REALM = "discord-direct.local";
 const DEFAULT_LIFETIME = 600;
@@ -369,27 +370,45 @@ async function resolveMappingProbeEndpoints(definitions, generation) {
   return endpoints;
 }
 
+function readLoopbackPreferenceSnapshot() {
+  if (!Services.prefs.prefHasUserValue(LOOPBACK_SNAPSHOT_PREF)) return null;
+  const snapshot = JSON.parse(Services.prefs.getStringPref(LOOPBACK_SNAPSHOT_PREF));
+  if (!snapshot || snapshot.version !== 1 ||
+      typeof snapshot.hadUserValue !== "boolean" || typeof snapshot.value !== "boolean") {
+    throw new Error("Discord Direct loopback preference baseline is invalid");
+  }
+  return snapshot;
+}
+
 function captureAndEnableLoopbackPreference() {
   if (!preferenceSnapshot) {
-    preferenceSnapshot = {
+    const snapshot = readLoopbackPreferenceSnapshot() || {
+      version: 1,
       hadUserValue: Services.prefs.prefHasUserValue(LOOPBACK_PREF),
       value: Services.prefs.getBoolPref(LOOPBACK_PREF, false),
     };
+    Services.prefs.setStringPref(LOOPBACK_SNAPSHOT_PREF, JSON.stringify(snapshot));
+    // Retain the original baseline alongside any later save of the forced value.
+    Services.prefs.savePrefFile(null);
+    preferenceSnapshot = snapshot;
   }
   Services.prefs.setBoolPref(LOOPBACK_PREF, true);
 }
 
-function restoreLoopbackPreference() {
+function restoreLoopbackPreference(preserveSnapshot = false) {
+  // A restarted add-on may be disabled before start() captures the baseline.
+  if (!preferenceSnapshot) preferenceSnapshot = readLoopbackPreferenceSnapshot();
   if (!preferenceSnapshot) return;
-  try {
-    if (preferenceSnapshot.hadUserValue) {
-      Services.prefs.setBoolPref(LOOPBACK_PREF, preferenceSnapshot.value);
-    } else if (Services.prefs.prefHasUserValue(LOOPBACK_PREF)) {
-      Services.prefs.clearUserPref(LOOPBACK_PREF);
-    }
-  } finally {
-    preferenceSnapshot = null;
+  if (preferenceSnapshot.hadUserValue) {
+    Services.prefs.setBoolPref(LOOPBACK_PREF, preferenceSnapshot.value);
+  } else if (Services.prefs.prefHasUserValue(LOOPBACK_PREF)) {
+    Services.prefs.clearUserPref(LOOPBACK_PREF);
   }
+  if (!preserveSnapshot) {
+    Services.prefs.clearUserPref(LOOPBACK_SNAPSHOT_PREF);
+    Services.prefs.savePrefFile(null);
+  }
+  preferenceSnapshot = null;
 }
 
 function endpointFromMessage(message) {
@@ -1254,8 +1273,12 @@ function handleClientPacket(socket, message) {
   }
 }
 
-function stopServer({ restorePreference = true } = {}) {
-  if (stopPromise) return stopPromise;
+function stopServer({ restorePreference = true, preservePreferenceSnapshot = false } = {}) {
+  if (stopPromise) {
+    // Shutdown still owns preference cleanup when socket cleanup is in flight.
+    if (restorePreference) restoreLoopbackPreference(preservePreferenceSnapshot);
+    return stopPromise;
+  }
   stopping = true;
   cancelDnsOperations();
   // Detach the control socket first so queued packets cannot create a fresh
@@ -1268,7 +1291,7 @@ function stopServer({ restorePreference = true } = {}) {
   failedMappingClients.clear();
   requestAllSocketCloses();
   configuration = null;
-  if (restorePreference) restoreLoopbackPreference();
+  if (restorePreference) restoreLoopbackPreference(preservePreferenceSnapshot);
 
   stopPromise = waitForSocketCloses().finally(() => {
     configuration = null;
@@ -1403,12 +1426,14 @@ this.loopbackTurnCompat147 = class extends ExtensionAPI {
     };
   }
 
-  onShutdown() {
+  onShutdown(isAppShutdown) {
     // stopServer initiates every native close synchronously before its first
     // await, so this remains effective even though ExperimentAPI shutdown does
     // not await returned promises.
     lifecycleGeneration += 1;
     cancelDnsOperations();
-    stopServer();
+    // prefs.js may have been saved already. Retain the journal for next startup;
+    // normal stop, disable, and uninstall restore and clear it.
+    stopServer({ preservePreferenceSnapshot: Boolean(isAppShutdown) });
   }
 };
