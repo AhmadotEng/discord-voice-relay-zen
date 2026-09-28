@@ -8,6 +8,8 @@ Zen's extension storage keeps only the enabled state and the user-configured STU
 
 The loopback TURN username and credential used by version 0.2.4 are generated for the current backend instance, kept in background memory, and never written to extension storage or logs.
 
+Starting with version 0.2.4.2, the browser preference `extensions.discord-direct.loopback-pref-snapshot` stores a small restoration journal: a schema version, whether `media.peerconnection.ice.loopback` originally had a user value, and its original Boolean value. It contains no credentials, addresses, or call data. Ordinary stop/disable restores the baseline and clears the journal. Browser shutdown retains the journal for recovery by a later extension instance; if a temporary add-on is not loaded again, the journal can remain in the profile. Preference-file saves are asynchronous and are not a guarantee against power loss.
+
 ## Network data
 
 - The configured STUN discovery endpoints receive small mapping probes and can observe the public IP address and UDP port from which each probe arrives.

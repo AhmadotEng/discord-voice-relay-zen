@@ -2,7 +2,7 @@
 
 Discord Direct for Zen is an experimental, privileged Zen/Firefox extension that applies the Discord Drover transport idea to **new Discord Web voice connections** without installing WARP, a native helper, a local daemon, a system proxy, or an external media relay.
 
-This direct build is version **0.2.4**. It replaces the earlier `Discord Voice Relay for Zen` version **0.1.0**, intentionally uses the same Gecko extension ID, clears that build's saved external TURN URL and credentials, and refuses to stack its page hook over an already-injected old hook. The original [v0.1.0 release](https://github.com/AhmadotEng/discord-voice-relay-zen/releases/tag/v0.1.0), tag, assets, and [setup document](LEGACY-V0.1.0.md) remain available.
+This source build is version **0.2.4.2**, adding preference restoration across restarts and overlapping shutdowns to version 0.2.4. It replaces the earlier `Discord Voice Relay for Zen` version **0.1.0**, intentionally uses the same Gecko extension ID, clears that build's saved external TURN URL and credentials, and refuses to stack its page hook over an already-injected old hook. The original [v0.1.0 release](https://github.com/AhmadotEng/discord-voice-relay-zen/releases/tag/v0.1.0), tag, assets, and [setup document](LEGACY-V0.1.0.md) remain available.
 
 ## Browser requirement
 
@@ -44,6 +44,8 @@ On September 19, 2026, version 0.2.4 passed a fresh live Discord call on macOS 1
 ## macOS Zen setup
 
 This is a temporary privileged extension, not an ordinary signed Firefox add-on.
+
+The download instructions below refer to the historical **v0.2.4** release. For the **0.2.4.2** fixes, use this checkout's `manifest.json` or build an XPI from this checkout; no new release asset is implied by the source version.
 
 1. Confirm Zen is version **1.22.2b or newer** (Firefox 152+ is required). Update Zen before loading this build if necessary.
 2. If the old **Discord Voice Relay for Zen** add-on is loaded, remove or replace it. This build uses the same extension ID so both cannot be loaded normally at the same time.
@@ -94,6 +96,8 @@ Version `0.1.0` of Discord Voice Relay stored these keys: `enabled`, `turnUrls`,
 - Code in Discord's MAIN world is trusted application code, not a security boundary. A compromised page can inspect its own `RTCPeerConnection` configuration. The exposed credentials are therefore short-lived and valid only for a tightly constrained loopback TURN server; there is no reusable provider secret.
 - `media.peerconnection.ice.loopback` is a browser-wide testing preference while the backend runs. The privileged API snapshots and restores its exact prior user/default state on stop, failure, extension shutdown, and Zen shutdown.
 
+Version 0.2.4.2 keeps that original baseline in `extensions.discord-direct.loopback-pref-snapshot`, containing only a schema version and two Boolean fields. Stop/disable restores and clears it, including when transport has not started in the new extension instance. Browser shutdown restores the in-memory preference while retaining the journal for the next instance; a temporary add-on that is never reloaded can leave the journal behind. A malformed journal is rejected rather than overwritten. Preference-file saves are asynchronous, so this is not a power-loss guarantee.
+
 ## Why a voice reconnect is required
 
 Changing ICE servers on an already-connected `RTCPeerConnection` does not change its selected path. An ICE restart and a new offer/answer exchange would be required, but current Discord Web does not expose a safe client-initiated restart path. The extension therefore configures only a pristine new voice connection. If setup is late, it rejects the offer and asks for one manual reconnect instead of attempting to mutate a live call.
@@ -114,7 +118,7 @@ node --test tests/*.test.cjs
 
 The suite covers the TURN codec and mapping policy, exact manifest boundaries, old-extension migration, loopback URL parsing, constructor targeting and subclass behavior, hook idempotency, offer/answer/implicit negotiation gates, background-boot and bridge-instance rollover, response races, multi-connection failure priority, the bounded readiness timeout, stale backend generations and proof revisions, stable revisions during ordinary counter growth, provisional ICE candidate errors, fail-closed errors, partial `setConfiguration()` merging with immutable fields, old-hook conflicts, and per-allocation selected-pair/backend success.
 
-The current suite passes **111/111** tests. The completed live test covered temporary installation, route preparation, a fresh Discord voice connection, a selected relay/UDP pair, **Protected route verified**, continued connection, and incoming audio.
+The current suite passes **139/139** tests, including 28 additional shutdown/preference regression cases covering absent/false/true baselines, restart recovery before transport starts, overlapping stops, and malformed saved state. The recorded **v0.2.4** live test covered temporary installation, route preparation, a fresh Discord voice connection, a selected relay/UDP pair, **Protected route verified**, continued connection, and incoming audio. See [TEST-RESULTS.md](TEST-RESULTS.md) for the separate validation status of this source update.
 
 Additional environments and longer-lived behavior still need validation before treating this as production-ready:
 
@@ -127,7 +131,7 @@ See [TESTING.md](TESTING.md) and [TEST-RESULTS.md](TEST-RESULTS.md) for the full
 
 ## Project layout
 
-- `api/implementation-gecko147.js` — privileged loopback TURN and upstream UDP transport copied from the reviewed PoC.
+- `api/implementation-gecko147.js` — privileged loopback TURN and upstream UDP transport based on the reviewed PoC, with packaged-script loading and preference-lifecycle fixes.
 - `lib/turn-codec.js` and `lib/mapping-policy.js` — TURN framing, authentication, address policy, and two-destination mapping decision.
 - `background.js` — settings migration, listener lifecycle, generation control, sender checks, and sanitized status.
 - `src/page-hook.js` — MAIN-world constructor hook, first-offer gate, route enforcement, and selected-pair verification.
@@ -143,7 +147,7 @@ npm test
 npm run build
 ```
 
-The macOS build script uses the system `zip` and `shasum` commands, writes the unsigned XPI and checksum to `dist/`, and packages every runtime file required by version 0.2.4.
+The macOS build script uses the system `zip` and `shasum` commands, writes the unsigned XPI and checksum to `dist/`, and packages every runtime file using the version from `manifest.json`.
 
 ## License and project status
 
