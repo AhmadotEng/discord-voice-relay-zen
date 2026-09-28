@@ -54,7 +54,7 @@ test("replacement keeps the old identity but has a strictly newer version", () =
     legacy.browser_specific_settings.gecko.id
   );
   assert.ok(compare(manifest.version, legacy.version) > 0);
-  assert.equal(manifest.version, "0.2.4");
+  assert.equal(manifest.version, "0.2.4.2");
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version, manifest.version);
 });
 
@@ -62,8 +62,10 @@ test("manifest requires the Firefox ICE relay validation fix", () => {
   assert.equal(manifest.browser_specific_settings.gecko.strict_min_version, "152.0");
 });
 
-test("integrated transport matches the reviewed PoC except for Firefox 155 loader hardening", () => {
-  const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
+test("integrated transport retains its reviewed libraries and lifecycle-fixed backend", () => {
+  // Git may check text out with CRLF on Windows; fingerprint canonical LF text.
+  const sha256 = (value) => crypto.createHash("sha256")
+    .update(String(value).replace(/\r\n/gu, "\n")).digest("hex");
   const reviewedHashes = new Map([
     ["api/schema.json", "2249edf7ccba0f76d22bae3b70868997a8d552c210b8d09410440c5b47bfc2b6"],
     ["lib/turn-codec.js", "c61fabc2595b0e9c8018a1b8f1af6a797e003e97cac373a8acccbc3966c6f771"],
@@ -88,14 +90,14 @@ test("integrated transport matches the reviewed PoC except for Firefox 155 loade
   let integrated = fs.readFileSync(
     path.join(root, "api/implementation-gecko147.js"),
     "utf8"
-  );
+  ).replace(/\r\n/gu, "\n");
   for (const library of ["turn-codec", "mapping-policy"]) {
     assert.equal(integrated.includes(hardenedLoader(library)), true, library);
     integrated = integrated.replace(hardenedLoader(library), legacyLoader(library));
   }
   assert.equal(
     sha256(integrated),
-    "8aaf693acbf4b22099a2d2f8693716e99461cf2f33d0115ef14187e61546d09b"
+    "aa98c356eecb490938c5f9a7cf44393dbaeb9507390cac13166212309d8faa53"
   );
 });
 
